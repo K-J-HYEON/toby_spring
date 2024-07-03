@@ -1,11 +1,11 @@
-package tobyspring.hellospring;
+package tobyspring.hellospring.payment;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class PaymentService {
-    private final ExRateProvider exRateProvider;
+    private ExRateProvider exRateProvider;
 
     public PaymentService(ExRateProvider exRateProvider) {
         this.exRateProvider = exRateProvider;
