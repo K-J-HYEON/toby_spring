@@ -1,34 +1,56 @@
 package tobyspring.hellospring.payment;
 
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tobyspring.hellospring.exrate.WebApiExRateProvider;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
+import static java.math.BigDecimal.valueOf;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
 
 class PaymentServiceTest {
+    Clock clock;
+
+    @BeforeEach
+    void beforeEach() {
+        this.clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+    }
 
     @Test
-    void prepare() throws IOException {
-        PaymentService paymentService = new PaymentService(new WebApiExRateProvider());
+    void convertedAmount() throws IOException {
+        Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+
+        testAmount(valueOf(500), valueOf(5_000), this.clock);
+        testAmount(valueOf(1_000), valueOf(10_000), this.clock);
+        testAmount(valueOf(3_000), valueOf(30_000), this.clock);
+    }
+
+    @Test
+    void validUntil() throws IOException {
+        PaymentService paymentService = new PaymentService(new ExRateProviderStub(valueOf(1_000)), clock);
 
         Payment payment = paymentService.prepare(1L, "USD", BigDecimal.TEN);
 
-        // 환융정보 가져온다
-        assertThat(payment.getExRate()).isNotNull();
+        // valid util이 prepare() 30분 뒤로 설정됐는가?
+        LocalDateTime now = LocalDateTime.now(this.clock);
+        LocalDateTime expectedValidUntil = now.plusMinutes(30);
 
-        // 원화한산금액 계산
-        assertThat(payment.getConvertedAmount())
-                .isEqualTo(payment.getExRate().multiply(payment.getForeignCurrencyAmount()));
+        Assertions.assertThat(payment.getValidUntil()).isEqualTo(expectedValidUntil);
 
-        // 원화환산 금액의 유효시간 계산
-        assertThat(payment.getValidUntil()).isAfter(LocalDateTime.now());
-        assertThat(payment.getValidUntil()).isBefore(LocalDateTime.now().plusMinutes(30));
+    }
+
+    private static void testAmount(BigDecimal exRate, BigDecimal convertedAmount, Clock clock) throws IOException {
+        PaymentService paymentService = new PaymentService(new ExRateProviderStub(exRate), clock);
+
+        Payment payment = paymentService.prepare(1L, "USD", BigDecimal.TEN);
+
+        assertThat(payment.getExRate()).isEqualByComparingTo(exRate);
+        assertThat(payment.getConvertedAmount()).isEqualByComparingTo(convertedAmount);
     }
 }
